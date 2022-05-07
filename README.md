@@ -23,7 +23,7 @@ $   ./setup -i
 $   ./setup install
 ```
 
-This will put a `svgo` config file in in `$HOME/.config/svg2svelte`, and copy `svg2svelte` to `/usr/local/bin`
+This will put a `svgo` config file in `$HOME/.config/svg2svelte`, and copy `svg2svelte` to `/usr/local/bin`
 
 ```bash
 Remove:
@@ -38,6 +38,6 @@ This will remove the config file/directory and also remove `svg2svelte` from `/u
 svg2svelte [input file]
 
 Examples:
-$   svg2svelte shapes.svg
-$   svg2svelte starball.svg
+$   svg2svelte shapes.svg -> Shapes.svelte
+$   svg2svelte ball.svg -> Ball.svelte
 ```
