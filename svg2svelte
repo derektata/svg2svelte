@@ -1,0 +1,90 @@
+#!/bin/sh
+
+config_path=$HOME/.config/svg2svelte
+
+# check if svgo is installed
+command -v svgo >/dev/null 2>&1 || {
+	echo "I require \e[1;33msvgo\e[0m but it's not installed." >&2
+	echo "Would you like to install it via \e[36mnpm\e[0m? (y/n) " >&2
+	read -r answer
+	if [ "$answer" = "y" ]; then
+		command -v npm >/dev/null 2>&1 || {
+			echo "I require \e[1;33mnpm\e[0m but it's not installed. Aborting." >&2
+			exit 1
+		}
+		npm install -g svgo
+	else
+		exit 1
+	fi
+}
+
+# check if ripgrep is installed
+command -v rg >/dev/null 2>&1 || {
+	echo >&2 "I require \e[1;33mripgrep\e[0m but it's not installed.  Aborting."
+	exit 1
+}
+
+help() {
+	printf "\n\e[1mUsage\e[0m: \e[34msvg2svelte\e[0m [input file]\n"
+}
+
+adobe_check() {
+	rg 'Adobe Illustrator' "$1" -q
+}
+
+# Grab the base filename, capitalize it, and add the .svelte suffix
+basename="${1%.*}"
+capitolized=$(echo "$basename" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+component="$capitolized.svelte"
+
+case "$1" in
+-h)
+	help
+	;;
+*)
+	# check if a file was passed as argument
+	if [ -z "$1" ]; then
+		echo "\e[31mYou need to provide a file to process. Aborting.\e[0m"
+		exit 1
+	fi
+	# check if the file provided ends with .svg
+	if [ "${1##*.}" != "svg" ]; then
+		echo "\e[31mError\e[0m: File must be an SVG"
+		exit 1
+	else
+		echo "\e[34mProcessing\e[0m $1"
+		if adobe_check "$1"; then
+			# if Adobe is found, don't use the svgo config file
+			svgo "$1" -o "$basename.min.svg" -q --pretty
+		else
+			# if Adobe is not found, use the svgo config file
+			svgo "$1" -o "$basename.min.svg" -q --pretty --config "$config_path/svgo.config.js"
+		fi
+		# find all the ids in the svg
+		ids=$(rg -o 'id="[^"]+"' "$basename.min.svg" | sed 's/id="//g' | sed 's/"//g')
+		# find the id's the begin with bind: and get the name after the colon
+		bind_ids=$(echo "$ids" | rg -o 'bind:.*' | sed 's/bind://g' | sed 's/://g')
+		for id in $bind_ids; do
+			# comma separate list of ids
+			ids_list="$ids_list, $id"
+		done
+		# remove the first comma and space
+		ids_list=${ids_list#", "}
+		# create the component
+		touch "$component"
+		# add variables and export them in script tag
+		printf "<script>\n\tlet %s;\n\t{\$\$restProps};\n</script>\n\n" "$ids_list" >"$component"
+		cat "$basename.min.svg" >>"$component"
+		# for each of the ids that begin with bind:, add bind:this={id} to the tag
+		for id in $bind_ids; do
+			sed -i "s/id=\"bind:$id\"/id=\"$id\" bind:this={$id}/g" "$component"
+		done
+		# add {...$$restProps} to starting svg tag
+		sed -i "s/<svg/<svg {...\$\$restProps}/g" "$component"
+		# remove the minified svg file
+		rm "$basename.min.svg"
+		# finished
+		echo "\e[32mDone!\e[0m"
+	fi
+	;;
+esac

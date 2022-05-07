@@ -1,0 +1,44 @@
+#!/bin/sh
+
+config_path=$HOME/.config/svg2svelte
+
+usage() {
+    printf "\n\e[1mUsage\e[0m: \e[34m%s\e[0m [option]\n\n" "$0"
+    printf "Options:\n"
+    printf " -i | install   install svg2svelte\n"
+    printf " -r | remove    remove svg2svelte\n"
+}
+
+install() {
+    if [ ! -d "$config_path" ]; then
+        mkdir -p "$config_path"
+        cp svgo.config.js "$config_path"
+        sudo cp svg2svelte /usr/local/bin/
+        sudo chmod +x /usr/local/bin/svg2svelte
+        printf "\n\e[32mInstalled\e[0m svg2svelte\n"
+    else
+        printf "\n\e[32msvg2svelte is already installed\e[0m\n"
+    fi
+}
+
+remove() {
+    if [ -d "$config_path" ]; then
+        rm -rf "$config_path"
+        sudo rm /usr/local/bin/svg2svelte
+        printf "\n\e[31mRemoved\e[0m svg2svelte\n"
+    else
+        printf "\n\e[31mNothing to remove\e[0m, svg2svelte is not installed\n"
+    fi
+}
+
+case $1 in
+-i | install)
+    install
+    ;;
+-r | remove)
+    remove
+    ;;
+-h | *)
+    usage
+    ;;
+esac
