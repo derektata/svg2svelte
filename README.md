@@ -16,6 +16,23 @@ Then it uses `ripgrep` to look for id's in the file that contain `bind:` and con
 
 ##### Tested with SVGs from Adobe Illustrator & Inkscape.
 
+## Setup
+```bash
+Install:
+$   ./setup -i
+$   ./setup install
+```
+
+This will put a `svgo` config file in in `$HOME/.config/svg2svelte`, and copy `svg2svelte` to `/usr/local/bin`
+
+```bash
+Remove:
+$   ./setup -r
+$   ./setup remove
+```
+
+This will remove the config file/directory and also remove `svg2svelte` from `/usr/local/bin`
+
 ## Usage:
 ```bash
 svg2svelte [input file]
