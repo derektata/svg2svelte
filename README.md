@@ -41,3 +41,8 @@ Examples:
 $   svg2svelte shapes.svg -> Shapes.svelte
 $   svg2svelte ball.svg -> Ball.svelte
 ```
+
+## Shoutouts 📣
+[@dceddia](https://github.com/dceddia) - Thank you for your awesome [video](https://www.youtube.com/watch?v=ePFw62HISRI) and explaining how the Ruby script worked. Unfortunately the script was tailored more for MacOS, as well as an outdated version of `svgo` and wouldn't work in my use case. So this project was born.
+
+You can find more info on his implementation [here](https://gist.github.com/dceddia/0a669466821b6f3c3dcbc2a5e2b3af04).
