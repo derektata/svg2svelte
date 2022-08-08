@@ -1,90 +1,36 @@
-#!/bin/sh
+#!/usr/bin/env sh
+set -eu
+command -v svgo >/dev/null 2>&1 || { echo >&2 "I require svgo but it's not installed.  Aborting."; exit 1; }
 
-config_path=$HOME/.config/svg2svelte
+if [ $# -eq 0 ]; then echo "Usage: svg2svelte <svg_file>"; exit 1; fi
+if [ "${1##*.}" != "svg" ]; then echo "Error: File must be an SVG"; exit 1; fi
+base=$(basename "$1" .svg)
+capitolized=$(echo "$base" | sed 's/\([[:alpha:]]\)/\U\1/')
+svelte_file="$capitolized.svelte"
+cp "$1" "$1.bak" # back up the file, so we don't destroy the original
 
-# check if svgo is installed
-command -v svgo >/dev/null 2>&1 || {
-	echo "I require \e[1;33msvgo\e[0m but it's not installed." >&2
-	echo "Would you like to install it via \e[36mnpm\e[0m? (y/n) " >&2
-	read -r answer
-	if [ "$answer" = "y" ]; then
-		command -v npm >/dev/null 2>&1 || {
-			echo "I require \e[1;33mnpm\e[0m but it's not installed. Aborting." >&2
-			exit 1
-		}
-		npm install -g svgo
-	else
-		exit 1
-	fi
-}
+ids=$(grep -o 'id="[^"]*"' "$1.bak" | sed 's/id="//g' | sed 's/"//g')
+bind_ids=$(echo "$ids" | grep -o 'bind:.*' | sed 's/bind://g' | sed 's/://g')
+vars=$(echo "$bind_ids" | tr '\n' ', ' | sed 's/,/, /g' | sed 's/, $//')
+minified="$(basename "$1" .svg).min.svg"
 
-# check if ripgrep is installed
-command -v rg >/dev/null 2>&1 || {
-	echo >&2 "I require \e[1;33mripgrep\e[0m but it's not installed.  Aborting."
-	exit 1
-}
+# Strip the bind: keywords from the backup
+for id in $bind_ids; do sed -i "s/id=\"bind:$id\"/id=\"$id\"/g" "$1.bak"; done
+# Change ids to classes
+sed -i "s/id=\"/class=\"/g" "$1.bak"
+# Minify the backed up file
+svgo "$1.bak" -o "$minified" -q --pretty
+# Create component
+touch "$svelte_file"
+# Add script tag and variables
+printf "<script>\n\tlet %s;\n</script>\n\n" "$vars" >> "$svelte_file"
+# Add the minified SVG data to the component
+cat "$minified" >> "$svelte_file"
+# Add the svelte bindings to the tags
+for id in $bind_ids; do
+    sed -i "s/class=\"$id\"/class=\"$id\" bind:this={$id}/g" "$svelte_file"
+done
 
-help() {
-	printf "\n\e[1mUsage\e[0m: \e[34msvg2svelte\e[0m [input file]\n"
-}
-
-adobe_check() {
-	rg 'Adobe Illustrator' "$1" -q
-}
-
-# Grab the base filename, capitalize it, and add the .svelte suffix
-basename="${1%.*}"
-capitolized=$(echo "$basename" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
-component="$capitolized.svelte"
-
-case "$1" in
--h)
-	help
-	;;
-*)
-	# check if a file was passed as argument
-	if [ -z "$1" ]; then
-		echo "\e[31mYou need to provide a file to process. Aborting.\e[0m"
-		exit 1
-	fi
-	# check if the file provided ends with .svg
-	if [ "${1##*.}" != "svg" ]; then
-		echo "\e[31mError\e[0m: File must be an SVG"
-		exit 1
-	else
-		echo "\e[34mProcessing\e[0m $1"
-		if adobe_check "$1"; then
-			# if Adobe is found, don't use the svgo config file
-			svgo "$1" -o "$basename.min.svg" -q --pretty
-		else
-			# if Adobe is not found, use the svgo config file
-			svgo "$1" -o "$basename.min.svg" -q --pretty --config "$config_path/svgo.config.js"
-		fi
-		# find all the ids in the svg
-		ids=$(rg -o 'id="[^"]+"' "$basename.min.svg" | sed 's/id="//g' | sed 's/"//g')
-		# find the id's the begin with bind: and get the name after the colon
-		bind_ids=$(echo "$ids" | rg -o 'bind:.*' | sed 's/bind://g' | sed 's/://g')
-		for id in $bind_ids; do
-			# comma separate list of ids
-			ids_list="$ids_list, $id"
-		done
-		# remove the first comma and space
-		ids_list=${ids_list#", "}
-		# create the component
-		touch "$component"
-		# add variables and export them in script tag
-		printf "<script>\n\tlet %s;\n\t{\$\$restProps};\n</script>\n\n" "$ids_list" >"$component"
-		cat "$basename.min.svg" >>"$component"
-		# for each of the ids that begin with bind:, add bind:this={id} to the tag
-		for id in $bind_ids; do
-			sed -i "s/id=\"bind:$id\"/id=\"$id\" bind:this={$id}/g" "$component"
-		done
-		# add {...$$restProps} to starting svg tag
-		sed -i "s/<svg/<svg {...\$\$restProps}/g" "$component"
-		# remove the minified svg file
-		rm "$basename.min.svg"
-		# finished
-		echo "\e[32mDone!\e[0m"
-	fi
-	;;
-esac
+# Cleanup & exit
+rm "$1.bak" "$minified"
+exit 0
